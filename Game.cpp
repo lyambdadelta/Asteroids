@@ -132,6 +132,7 @@ void Asteroid::Draw(uint32_t buff[]) {
     int x = static_cast<int>(pos.x);
     int y = static_cast<int>(pos.y);
     int R = static_cast<int>(size);
+    
     for (int i = x - R; i <= x + R; i++) {
         for (int j = y - R; j <= y + R; j++) {
             if (std::pow(x - i, 2) + std::pow(y - j, 2) <= std::pow(R, 2)) {
@@ -143,7 +144,13 @@ void Asteroid::Draw(uint32_t buff[]) {
 
 void Asteroid::Move(float dt) {
     pos.x = fmod(pos.x - speed * sinf(dir) * dt, SCREEN_WIDTH);
-    pos.y = fmod(pos.y + speed * cosf(dir) * dt, SCREEN_WIDTH);
+    if (pos.x < 0) {
+        pos.x += SCREEN_WIDTH;
+    }
+    pos.y = fmod(pos.y + speed * cosf(dir) * dt, SCREEN_HEIGHT);
+    if (pos.x < 0) {
+        pos.x += SCREEN_HEIGHT;
+    }
 }
 
 void Asteroid::SetInitSize(AsteroidSize argSize) {
@@ -199,7 +206,7 @@ void Asteroid::SetInitColor(AsteroidSpeed argSpeed) {
 }
 
 GameManager::GameManager() {
-    levelDifficulties = { {6, 0, 0}, {4, 1, 1}, {2, 2, 2}, {0, 2, 4} };
+    levelDifficulties = { {10, 10, 10}, {4, 1, 1}, {2, 2, 2}, {0, 2, 4} };
     lifes = 3;
     level = 0;
     points = 0;
