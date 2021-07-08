@@ -1,13 +1,23 @@
 #pragma once
 #include "Engine.h"
 #include <vector>
+#include <list>
 
+// Diferent states of the game
+enum class GameState {
+    MAINMENU,
+    LEADERBOARD,
+    GAME
+};
+
+// Different colors for different Speed-type asteroids
 enum class AsteroidSpeed {
     SLOW,
     MEDIUM,
     FAST
 };
 
+// Different stage of Asteroid's life
 enum class AsteroidSize {
     SMALL,
     NORMAL,
@@ -31,6 +41,7 @@ struct BGRA {
 
 float Distance(POINT a, POINT b);
 int mod(int value, int m);
+void Bresenham(uint32_t buff[], POINT d1, POINT d2);
 
 class GameObject {
 public:
@@ -39,9 +50,10 @@ public:
     float GetSpeed() const;
     float GetDirection() const;
     POINT GetPosition() const;
+    uint32_t GetColor() const;
     void Rotate(float angle);
-    virtual void Draw(uint32_t buff[]) {}
-    virtual void Move(float dt) {}
+    virtual void Draw(uint32_t buff[]);
+    virtual void Move(float dt);
 protected:
     void SetColor(BGRA argColor);
     void SetDirection(float argDir);
@@ -58,12 +70,19 @@ protected:
 class Player : public GameObject {
 public:
     Player();
+    void Draw(uint32_t buff[]) override;
+    void Move(float dt) override;
+    void Accelerate(float dt);
 private:
+    // Due to acceleration it is easier to store sped as x and y values,
+    // not as speed and direction
+    POINT speed;
 };
 
 class Bullet : public GameObject {
 public:
     Bullet(Player player);
+    bool UpdateTime(float dt);
 private:
     void SetInitPosition(Player player);
     float ttl;
@@ -72,8 +91,9 @@ private:
 class Asteroid : public GameObject {
 public:
     Asteroid(AsteroidSpeed argSpeed, AsteroidSize argSize);
-    void Draw(uint32_t buff[]) override;
-    void Move(float dt) override;
+    Asteroid(Asteroid prev, bool type);
+    AsteroidSpeed GetSpeedType() const;
+    AsteroidSize GetSizeType() const;
 private:
     AsteroidSpeed speedType;
     AsteroidSize sizeType;
@@ -84,23 +104,29 @@ private:
     void SetInitColor(AsteroidSpeed argSpeed);
 };
 
+// Manager for the game that controls situation on the field
 class GameManager {
 public:
     Player player;
     std::vector<Asteroid> asteroids;
-    std::vector<Bullet> bullets;
+    std::list<Bullet> bullets;
 
     std::vector<std::vector<int>> levelDifficulties;
 
     GameManager();
 
+    void UpdateTime(float dt);
     void StartLevel();
-    bool IsLevelOver();
-    int GetLifes();
+    bool IsLevelOver() const;
+    int GetLifes() const;
     void LostLife();
-    bool IsGameOver();
+    bool IsGameOver() const;
+    bool CanShoot() const;
+    void Shoot();
 private:
+    GameState state;
     uint64_t points;
     int lifes;
     int level;
+    float time;
 };
