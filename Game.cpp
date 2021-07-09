@@ -1,5 +1,6 @@
 #include "Engine.h"
 #include "Game.h"
+#include "Bitmap.h"
 #include <stdlib.h>
 #include <memory.h>
 #include <cmath>
@@ -9,16 +10,17 @@
 #include <cassert>
 
 constexpr float M_PI = 3.14159265358979323846;
-constexpr float ROTATIONSPEED = 3.5;
-constexpr auto ACCELERATION = 20;
-constexpr auto MAXSPEED = 100;
-constexpr auto BULLETSPEED = 150;
+constexpr float ROTATIONSPEED = 1.5;
+constexpr auto ACCELERATION = 50;
+constexpr auto MAXSPEED = 120;
+constexpr auto BULLETSPEED = 200;
 constexpr auto BULLETTIME = 3;
 constexpr int BULLETSIZE = 3;
-constexpr auto NONCREATIONRADIUS = 600;
+constexpr auto NONCREATIONRADIUS = 300;
 constexpr auto LIVES = 3;
 constexpr auto SIZE = 15;
 constexpr float PAUSETIME = 1.0f;
+constexpr float INVINCIBLETIME = 5.0f;
 
 uint32_t BGRA::GetInt() const {
     return alpha << 24 | red << 16 | green << 8 | blue;
@@ -36,11 +38,49 @@ BGRA::BGRA(uint8_t b, uint8_t g, uint8_t r, uint8_t a) {
     alpha = a;
 }
 
+void DrawString(uint32_t buff[], std::string str, uint32_t posx, uint32_t posy, uint32_t size = 4) {
+    assert(posx < SCREEN_WIDTH - 4 && posy < SCREEN_HEIGHT - 8);
+    uint32_t start;
+    for (const auto& x : str) {
+        if (bitmap.find(x) == bitmap.end()) {
+            continue;
+        }
+        start = posx;
+        for (int j = 0; j < bitmap[x].size(); j++) {
+            for (int i = 0; i < bitmap[x][j].size(); i++) {
+                if (bitmap[x][j][i]) {
+                    for (int k = 0; k < size; k++) {
+                        for (int l = 0; l < size; l++) {
+                            buff[mod(posy + j * size + k, SCREEN_HEIGHT) * SCREEN_WIDTH + mod(posx + i * size + l, SCREEN_WIDTH)] = BGRA({ 255, 255, 255, 0 }).GetInt();
+                        }
+                    }
+                }
+            }
+        }
+        posx = start + size * (bitmap[x][0].size() + 1);
+    }
+
+}
+
 float Distance(POINT a, POINT b) {
-    return std::min(std::min(std::sqrtf(pow(a.x - b.x, 2) + pow(a.y - b.y, 2)),
-        std::sqrtf(pow(a.x + b.x - SCREEN_WIDTH, 2) + pow(a.y - b.y, 2))),
-        std::min(std::sqrtf(pow(a.x - b.x, 2) + pow(a.y + b.y - SCREEN_HEIGHT, 2)),
-            std::sqrtf(pow(a.x + b.x - SCREEN_WIDTH, 2) + pow(a.y + b.y - SCREEN_HEIGHT, 2))));
+    float minValue = std::min({
+        powf(a.x - b.x, 2) + powf(a.y - b.y, 2),
+        powf(a.x - b.x + SCREEN_WIDTH, 2) + powf(a.y - b.y, 2),
+        powf(-a.x + b.x + SCREEN_WIDTH, 2) + powf(a.y - b.y, 2),
+        powf(a.x - b.x, 2) + powf(a.y - b.y + SCREEN_HEIGHT, 2),
+        powf(a.x - b.x, 2) + powf(-a.y + b.y + SCREEN_HEIGHT, 2),
+        powf(a.x - b.x + SCREEN_WIDTH, 2) + powf(a.y - b.y + SCREEN_HEIGHT, 2),
+        powf(a.x - b.x + SCREEN_WIDTH, 2) + powf(-a.y + b.y + SCREEN_HEIGHT, 2),
+        powf(-a.x + b.x + SCREEN_WIDTH, 2) + powf(a.y - b.y + SCREEN_HEIGHT, 2),
+        powf(-a.x + b.x + SCREEN_WIDTH, 2) + powf(-a.y + b.y + SCREEN_HEIGHT, 2),
+    });
+    return std::sqrtf(minValue);
+}
+
+void DecreaseTime(float& t, float dt) {
+    if (t != 0) {
+        t = (t - dt <= 0) ? 0.0f : t - dt;
+    }
 }
 
 int mod(int value, int m) {
@@ -57,13 +97,15 @@ void Bresenham(uint32_t buff[], POINT d1, POINT d2) {
     int err = dx + dy;
     int e2 = 0;
 
-    for ( int x = x1, y = y1; x != x2 || y != y2; ) {  /* loop */
+    for ( int x = x1, y = y1; x != x2 || y != y2; ) {
         buff[mod(y, SCREEN_HEIGHT) * SCREEN_WIDTH + mod(x, SCREEN_WIDTH)] = BGRA({ 255, 255, 255, 0 }).GetInt();
         if (x1 == x2 && y1 == y2) break;
         e2 = 2 * err;
-        if (e2 >= dy) { err += dy; x += sx; } /* e_xy+e_x > 0 */
-        if (e2 <= dx) { err += dx; y += sy; } /* e_xy+e_y < 0 */
+        if (e2 >= dy) { err += dy; x += sx; }
+        if (e2 <= dx) { err += dx; y += sy; }
     }
+
+    return;
 }
 
 static POINT INIT_POS = { SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 };
@@ -138,6 +180,7 @@ void GameObject::Draw(uint32_t buff[]) {
             }
         }
     }
+    return;
 }
 
 void GameObject::Move(float dt) {
@@ -149,25 +192,29 @@ void GameObject::Move(float dt) {
     if (pos.x < 0) {
         pos.x += SCREEN_HEIGHT;
     }
+    return;
 }
 
 Player::Player() : GameObject() {
     pos = INIT_POS;
     dir = 0;
+    size = SIZE;
     speed = {0, 0};
+    return;
 }
 
 void Player::Draw(uint32_t buff[]) {
     // Calculate 4 dots for creating triangle-like player
-    POINT d1 = { pos.x + SIZE * cosf(dir), pos.y + SIZE * sinf(dir) };
-    POINT d2 = { pos.x + SIZE * cosf(dir + 5 * M_PI / 6), pos.y + SIZE * sinf(dir + 5 * M_PI / 6) };
-    POINT d3 = { pos.x + 0.6 * SIZE * cosf(dir + M_PI), pos.y + 0.6 * SIZE * sinf(dir + M_PI) };
-    POINT d4 = { pos.x + SIZE * cosf(dir - 5 * M_PI / 6), pos.y + SIZE * sinf(dir - 5 * M_PI / 6) };
+    POINT d1 = { pos.x + size * cosf(dir), pos.y + size * sinf(dir) };
+    POINT d2 = { pos.x + size * cosf(dir + 5 * M_PI / 6), pos.y + size * sinf(dir + 5 * M_PI / 6) };
+    POINT d3 = { pos.x + 0.6 * size * cosf(dir + M_PI), pos.y + 0.6 * size * sinf(dir + M_PI) };
+    POINT d4 = { pos.x + size * cosf(dir - 5 * M_PI / 6), pos.y + size * sinf(dir - 5 * M_PI / 6) };
     // Call Bresenham's line algorithm 4 times
     Bresenham(buff, d1, d2);
     Bresenham(buff, d2, d3);
     Bresenham(buff, d3, d4);
     Bresenham(buff, d4, d1);
+    return;
 }
 
 void Player::Move(float dt) {
@@ -179,29 +226,38 @@ void Player::Move(float dt) {
     if (pos.x < 0) {
         pos.x += SCREEN_HEIGHT;
     }
+    return;
 }
 
 void Player::Accelerate(float dt) {
     POINT newSpeed = speed;
     newSpeed.x += ACCELERATION * cosf(dir) * dt;
     newSpeed.y += ACCELERATION * sinf(dir) * dt;
-    if (std::pow(newSpeed.x, 2) + std::pow(newSpeed.y, 2) <= std::pow(MAXSPEED, 2)) {
+    float newSpeedMod = std::sqrtf(std::pow(newSpeed.x, 2) + std::pow(newSpeed.y, 2));
+    if (newSpeedMod > MAXSPEED) {
+        speed.x = newSpeed.x / newSpeedMod * MAXSPEED;
+        speed.y = newSpeed.y / newSpeedMod * MAXSPEED;
+    }
+    else {
         speed = newSpeed;
     }
     return;
 }
 
 Bullet::Bullet(Player player) : GameObject() {
-    dir = player.GetDirection();
-    speed = player.GetSpeed() + BULLETSPEED;
+    SetDirection(GetDirection());
+    SetSpeed(BULLETSPEED);
     SetInitPosition(player);
     SetSize(BULLETSIZE);
     SetColor({ 255, 255, 255, 0 }); 
     ttl = BULLETTIME;
+    return;
 }
 
 void Bullet::SetInitPosition(Player player) {
-    SetPosition(player.GetPosition());
+    SetPosition({ player.GetPosition().x + (player.GetSize() + GetSize()) * cosf(player.GetDirection()),  
+                    player.GetPosition().y + (player.GetSize() + GetSize()) * sinf(player.GetDirection()) });
+    return;
 }
 
 bool Bullet::UpdateTime(float dt) {
@@ -221,15 +277,16 @@ AsteroidSize Asteroid::GetSizeType() const {
     return sizeType;
 }
 
-Asteroid::Asteroid(Asteroid prev, bool type) {
+Asteroid::Asteroid(const Asteroid& prev, bool type) {
     speedType = prev.GetSpeedType();
     assert(prev.GetSizeType() != AsteroidSize::SMALL);
     sizeType = AsteroidSize(static_cast<int>(prev.GetSizeType()) - 1);
     SetInitSize(sizeType);
-    SetSpeed(prev.GetSpeed() * sqrtf(2));
-    SetDirection(prev.GetDirection() + (type) ? M_PI : -M_PI / 4);
+    SetSpeed(prev.GetSpeed() * 2 / sqrtf(3));
+    SetDirection(prev.GetDirection() + ((type) ? M_PI : -M_PI) / 6);
     SetPosition(prev.GetPosition());
     SetInitColor(speedType);
+    return;
 }
 
 Asteroid::Asteroid(AsteroidSpeed argSpeed, AsteroidSize argSize) {
@@ -240,20 +297,22 @@ Asteroid::Asteroid(AsteroidSpeed argSpeed, AsteroidSize argSize) {
     SetInitDirection();
     SetInitPosition();
     SetInitColor(argSpeed);
+    return;
 }
 
 void Asteroid::SetInitSize(AsteroidSize argSize) {
     switch (argSize) {
     case AsteroidSize::SMALL:
-        SetSize(10.0);
-        break;
-    case AsteroidSize::NORMAL:
         SetSize(20.0);
         break;
+    case AsteroidSize::NORMAL:
+        SetSize(27.0);
+        break;
     case AsteroidSize::BIG:
-        SetSize(30.0);
+        SetSize(35.0);
         break;
     }
+    return;
 }
 
 void Asteroid::SetInitSpeed(AsteroidSpeed argSpeed) {
@@ -268,18 +327,22 @@ void Asteroid::SetInitSpeed(AsteroidSpeed argSpeed) {
         SetSpeed(100);
         break;
     }
+    return;
 }
 void Asteroid::SetInitDirection() {
     SetDirection(static_cast <float> (std::rand()) / static_cast <float> (RAND_MAX) * 2 * M_PI);
     return;
 }
+
 void Asteroid::SetInitPosition() {
     POINT argPos;
     do {
-        argPos = { static_cast <float> (std::rand() % SCREEN_WIDTH), static_cast <float> (std::rand() % SCREEN_WIDTH) };
+        argPos = { static_cast <float> (std::rand() % SCREEN_WIDTH), static_cast <float> (std::rand() % SCREEN_HEIGHT) };
     } while (Distance(argPos, INIT_POS) < NONCREATIONRADIUS);
     SetPosition(argPos);
+    return;
 }
+
 void Asteroid::SetInitColor(AsteroidSpeed argSpeed) {
     switch (argSpeed) {
     case AsteroidSpeed::SLOW:
@@ -297,26 +360,72 @@ void Asteroid::SetInitColor(AsteroidSpeed argSpeed) {
 }
 
 GameManager::GameManager() {
-    levelDifficulties = { {10, 10, 10}, {4, 1, 1}, {2, 2, 2}, {0, 2, 4} };
-    lifes = 3;
+    levelDifficulties = { {5, 1, 0}, {3, 2, 1}, {1, 3, 2}, {1, 1, 4} };
+    lifes = LIVES;
     level = 0;
-    points = 0;
+    invincibleTime = INVINCIBLETIME;
+    time = 0;
+    points = maxPoints = 0;
     state = GameState::GAME;
+    return;
+}
+
+void GameManager::RestartGame() {
+    lifes = LIVES;
+    points = 0;
+    level = 0;
+    time = 0;
+    state = GameState::GAME;
+    StartLevel();
+    return;
 }
 
 void GameManager::StartLevel() {
-    assert(level >= 0 && level <= 3);
     for (int i = 0; i < levelDifficulties[level].size(); i++) {
         for (int j = 0; j < levelDifficulties[level][i]; j++) {
             asteroids.push_back(Asteroid(static_cast<AsteroidSpeed>(i), AsteroidSize::BIG));
         }
     }
+    return;
 }
 
-void GameManager::UpdateTime(float dt) {
-    if (time != 0) {
-        time = (time - dt <= 0) ? 0.0f : time - dt;
+void GameManager::NextLevel() {
+    assert(asteroids.empty());
+    if (level != levelDifficulties.size() - 1) {
+        level++;
     }
+    else {
+        // add 1 Fast every time after beating last level 
+        levelDifficulties[levelDifficulties.size() - 1][2]++;
+    }
+    time = 0;
+    bullets.clear();
+    player = Player();
+    StartLevel();
+    return;
+}
+
+void GameManager::setState(GameState argState) {
+    state = argState;
+}
+
+GameState GameManager::GetState() const {
+    return state;
+}
+
+void GameManager::GameOver() {
+    asteroids.clear();
+    bullets.clear();
+    player.SetColor({ 0, 0, 0, 0 });
+    if (points > maxPoints) {
+        maxPoints = points;
+    }
+    setState(GameState::GAMEOVER);
+}
+
+void GameManager::UpdateTimeGame(float dt) {
+    DecreaseTime(time, dt);
+    DecreaseTime(invincibleTime, dt);
     for (auto it = bullets.begin(); it != bullets.end();) {
         it = (it->UpdateTime(dt)) ? bullets.erase(it) : ++it;
     }
@@ -327,22 +436,56 @@ void GameManager::UpdateTime(float dt) {
     for (auto& x : bullets) {
         x.Move(dt);
     }
-    //for (auto itb = bullets.begin(); itb != bullets.end();) {
-    //    itb->Move(dt);
-    //    for (auto ita = asteroids.begin(); ita != asteroids.end();) {
-    //        if (Distance(ita->GetPosition(), itb->GetPosition()) <= ita->GetSize() + itb->GetSize()) {
-    //            itb = bullets.erase(itb);
-    //            if (ita->GetSizeType() != AsteroidSize::SMALL) {
-    //                asteroids.push_back(Asteroid(*ita, false));
-    //                asteroids.push_back(Asteroid(*ita, true));
-    //            }
-    //            ita = asteroids.erase(ita);
-    //        }
-    //        else {
-    //            ita++;
-    //        }
-    //    }
-    //}
+    // Collision between Player and Asteroids
+    for (const auto& x : asteroids) {
+        if (Distance(x.GetPosition(), player.GetPosition()) <= x.GetSize() + player.GetSize() * 0.6) {
+            player = Player();
+            if (invincibleTime == 0) {
+                lifes--;
+            }
+            invincibleTime = INVINCIBLETIME;
+        }
+    }
+    // Collision between Player and bullets
+    for (auto itB = bullets.begin(); itB != bullets.end(); itB++) {
+        if (Distance(itB->GetPosition(), player.GetPosition()) <= itB->GetSize() + player.GetSize() * 0.6) {
+            bullets.erase(itB);
+            player = Player();
+            lifes--;
+            invincibleTime = INVINCIBLETIME;
+            break;
+        }
+    }
+    // Collision between Bullets and Asteroids
+    for (auto itB = bullets.begin(); itB != bullets.end();) {
+        bool next = true;
+        for (auto itA = asteroids.begin(); itA != asteroids.end(); itA++) {
+            if (Distance(itA->GetPosition(), itB->GetPosition()) <= itA->GetSize() + itB->GetSize()) {
+                auto t = Distance(itA->GetPosition(), itB->GetPosition());
+                next = false;
+                Asteroid parent = *itA;
+                itA = asteroids.erase(itA);
+                itB = bullets.erase(itB);
+                if (parent.GetSizeType() != AsteroidSize::SMALL) {
+                    asteroids.push_back(Asteroid(parent, false));
+                    asteroids.push_back(Asteroid(parent, true));
+                }
+                points += (3 - static_cast<int64_t>(parent.GetSizeType())) * (pow(10, static_cast<int>(parent.GetSpeedType()))) * (level + 1);
+                break;
+            }
+        }
+        if (next) {
+            itB++;
+        }
+    }
+    if (IsLevelOver()) {
+        NextLevel();
+        return;
+    }
+    if (IsGameOver()) {
+        GameOver();
+        return;
+    }
     return;
 }
 
@@ -353,9 +496,12 @@ bool GameManager::IsLevelOver() const {
 int GameManager::GetLifes() const {
     return lifes;
 }
+
 void GameManager::LostLife() {
     lifes--;
+    return;
 }
+
 bool GameManager::IsGameOver() const {
     return !lifes;
 }
@@ -367,22 +513,29 @@ bool GameManager::CanShoot() const {
 void GameManager::Shoot() {
     time = PAUSETIME;
     bullets.push_back(Bullet(player));
+    return;
+}
+
+uint64_t GameManager::GetPoints() const {
+    return points;
+}
+
+uint64_t GameManager::GetMaxPoints() const {
+    return maxPoints;
 }
 
 //
 //  IDEAS:
-//  Collision detection (if asteroids - change direction [probably don't implement it], if player - take the life and don't change the direction)
+//  Collision detection (if asteroids - change direction [probably don't implement it])
 //  Create default BG
-//  If player dies in N first seconds after respawn - no penalties
-//  When asteroid breaks into 2 part - tangential speed remains the same and normal speed are create for purpose of 30 degrees for initial derection
-//  Start New level after LevelOver() == true
 //  MAIN MENU with LEADERBOARD (stored in file as binary data)
+//  Add multiplayer and display lives/point for both players
 //
 
 //
 //  EXPLANATIONS:
-//  get_cursor_x(), get_cursor_y() - get mouse cursor position                                                 - WE DON'T NEED IT
-//  is_mouse_button_pressed(int button) - check if mouse button is pressed (0 - left button, 1 - right button) - WE DON'T NEED IT
+//  get_cursor_x(), get_cursor_y() - get mouse cursor position                                                 - WE CAN USE IT FOR MAIN MENU
+//  is_mouse_button_pressed(int button) - check if mouse button is pressed (0 - left button, 1 - right button) - WE CAN USE IT FOR MAIN MENU
 //  clear_buffer() - set all pixels in buffer to 'black'
 //  is_window_active() - returns true if window is active
 //  schedule_quit_game() - quit game after act()
@@ -395,29 +548,43 @@ void initialize() {
     srand(static_cast<unsigned int>(time(0)));
     gameManager = {};
     gameManager.StartLevel();
+    return;
 }
 
 // this function is called to update game data,
 // dt - time elapsed since the previous update (in seconds)
 void act(float dt) {
-    gameManager.UpdateTime(dt);
-    if (is_key_pressed(VK_ESCAPE)) {
-        schedule_quit_game();
-    }
-    if (is_key_pressed(VK_LEFT)) {
-        gameManager.player.Rotate(-dt * ROTATIONSPEED);
-    }
-    if (is_key_pressed(VK_RIGHT)) {
-        gameManager.player.Rotate(dt * ROTATIONSPEED);
-    }
-    if (is_key_pressed(VK_UP)) {
-        gameManager.player.Accelerate(dt);
-    }
-    if (is_key_pressed(VK_SPACE)) {
-        if (gameManager.CanShoot()) {
-            gameManager.Shoot();
+    if (is_window_active()) {
+        if (gameManager.GetState() == GameState::GAME) {
+            gameManager.UpdateTimeGame(dt);
+            if (is_key_pressed(VK_ESCAPE)) {
+                schedule_quit_game();
+            }
+            if (is_key_pressed(VK_LEFT)) {
+                gameManager.player.Rotate(-dt * ROTATIONSPEED);
+            }
+            if (is_key_pressed(VK_RIGHT)) {
+                gameManager.player.Rotate(dt * ROTATIONSPEED);
+            }
+            if (is_key_pressed(VK_UP)) {
+                gameManager.player.Accelerate(dt);
+            }
+            if (is_key_pressed(VK_SPACE)) {
+                if (gameManager.CanShoot()) {
+                    gameManager.Shoot();
+                }
+            }
+        }
+        else if (gameManager.GetState() == GameState::GAMEOVER) {
+            if (is_key_pressed(VK_ESCAPE)) {
+                schedule_quit_game();
+            }
+            if (is_key_pressed('F')) {
+                gameManager.RestartGame();
+            }
         }
     }
+    return;
 }
 
 // fill buffer in this function
@@ -425,15 +592,28 @@ void act(float dt) {
 void draw() {
     // clear backbuffer
     memset(buffer, 0, SCREEN_HEIGHT * SCREEN_WIDTH * sizeof(uint32_t));
-    for (auto& x : gameManager.bullets) {
-        x.Draw(reinterpret_cast<uint32_t*>(buffer));
+    if (gameManager.GetState() == GameState::GAME || gameManager.GetState() == GameState::PAUSE) {
+        for (auto& x : gameManager.bullets) {
+            x.Draw(reinterpret_cast<uint32_t*>(buffer));
+        }
+        for (auto& x : gameManager.asteroids) {
+            x.Draw(reinterpret_cast<uint32_t*>(buffer));
+        }
+        gameManager.player.Draw(reinterpret_cast<uint32_t*>(buffer));
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "score: " + std::to_string(gameManager.GetPoints()), 10, 10);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "highscore: " + std::to_string(gameManager.GetMaxPoints()), 400, 10);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "lives: " + std::to_string(gameManager.GetLifes()), SCREEN_WIDTH - 140, 10);
+        return;
     }
-    for (auto& x : gameManager.asteroids) {
-        x.Draw(reinterpret_cast<uint32_t*>(buffer));
+    else if (gameManager.GetState() == GameState::GAMEOVER) {
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "game over!", 300, SCREEN_HEIGHT/2 - 50, 10);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "your score: " + std::to_string(gameManager.GetPoints()), 300, SCREEN_HEIGHT / 2 + 50);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "your highscore: " + std::to_string(gameManager.GetMaxPoints()), 300, SCREEN_HEIGHT / 2 + 100);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "press f to pay replay! ", 300, SCREEN_HEIGHT / 2 + 150);
     }
-    gameManager.player.Draw(reinterpret_cast<uint32_t*>(buffer));
 }
 
 // free game data in this function
 void finalize() {
+    return;
 }

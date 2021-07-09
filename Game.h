@@ -1,5 +1,6 @@
 #pragma once
 #include "Engine.h"
+#include <string>
 #include <vector>
 #include <list>
 
@@ -7,7 +8,9 @@
 enum class GameState {
     MAINMENU,
     LEADERBOARD,
-    GAME
+    GAME,
+    PAUSE,
+    GAMEOVER
 };
 
 // Different colors for different Speed-type asteroids
@@ -42,6 +45,8 @@ struct BGRA {
 float Distance(POINT a, POINT b);
 int mod(int value, int m);
 void Bresenham(uint32_t buff[], POINT d1, POINT d2);
+void DecreaseTime(float& t, float dt);
+void DrawString(uint32_t buff[], std::string str, uint32_t posx, uint32_t posy, uint32_t size);
 
 class GameObject {
 public:
@@ -54,8 +59,8 @@ public:
     void Rotate(float angle);
     virtual void Draw(uint32_t buff[]);
     virtual void Move(float dt);
-protected:
     void SetColor(BGRA argColor);
+protected:
     void SetDirection(float argDir);
     void SetSize(float argSize);
     void SetSpeed(float argSpeed);
@@ -91,7 +96,7 @@ private:
 class Asteroid : public GameObject {
 public:
     Asteroid(AsteroidSpeed argSpeed, AsteroidSize argSize);
-    Asteroid(Asteroid prev, bool type);
+    Asteroid(const Asteroid& prev, bool type);
     AsteroidSpeed GetSpeedType() const;
     AsteroidSize GetSizeType() const;
 private:
@@ -115,18 +120,27 @@ public:
 
     GameManager();
 
-    void UpdateTime(float dt);
+    void UpdateTimeGame(float dt);
+    void RestartGame();
     void StartLevel();
+    void NextLevel();
+    void GameOver();
     bool IsLevelOver() const;
     int GetLifes() const;
     void LostLife();
+    GameState GetState() const;
     bool IsGameOver() const;
     bool CanShoot() const;
+    uint64_t GetPoints() const;
+    uint64_t GetMaxPoints() const;
     void Shoot();
+    void setState(GameState argState);
 private:
     GameState state;
     uint64_t points;
+    uint64_t maxPoints;
     int lifes;
     int level;
     float time;
+    float invincibleTime;
 };
