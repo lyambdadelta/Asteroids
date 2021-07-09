@@ -244,9 +244,13 @@ void Player::Accelerate(float dt) {
     return;
 }
 
+POINT Player::GetSpeed() {
+    return speed;
+}
+
 Bullet::Bullet(Player player) : GameObject() {
-    SetDirection(GetDirection());
     SetSpeed(BULLETSPEED);
+    SetDirection(atan2f(sinf(player.GetDirection()) * GetSpeed() + player.GetSpeed().y, cosf(player.GetDirection()) * GetSpeed() + player.GetSpeed().x));
     SetInitPosition(player);
     SetSize(BULLETSIZE);
     SetColor({ 255, 255, 255, 0 }); 
@@ -600,16 +604,16 @@ void draw() {
             x.Draw(reinterpret_cast<uint32_t*>(buffer));
         }
         gameManager.player.Draw(reinterpret_cast<uint32_t*>(buffer));
-        DrawString(reinterpret_cast<uint32_t*>(buffer), "score: " + std::to_string(gameManager.GetPoints()), 10, 10);
-        DrawString(reinterpret_cast<uint32_t*>(buffer), "highscore: " + std::to_string(gameManager.GetMaxPoints()), 400, 10);
-        DrawString(reinterpret_cast<uint32_t*>(buffer), "lives: " + std::to_string(gameManager.GetLifes()), SCREEN_WIDTH - 140, 10);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "Score: " + std::to_string(gameManager.GetPoints()), 10, 10);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "Highscore: " + std::to_string(gameManager.GetMaxPoints()), 400, 10);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "Lives: " + std::to_string(gameManager.GetLifes()), SCREEN_WIDTH - 140, 10);
         return;
     }
     else if (gameManager.GetState() == GameState::GAMEOVER) {
-        DrawString(reinterpret_cast<uint32_t*>(buffer), "game over!", 300, SCREEN_HEIGHT/2 - 50, 10);
-        DrawString(reinterpret_cast<uint32_t*>(buffer), "your score: " + std::to_string(gameManager.GetPoints()), 300, SCREEN_HEIGHT / 2 + 50);
-        DrawString(reinterpret_cast<uint32_t*>(buffer), "your highscore: " + std::to_string(gameManager.GetMaxPoints()), 300, SCREEN_HEIGHT / 2 + 100);
-        DrawString(reinterpret_cast<uint32_t*>(buffer), "press f to pay replay! ", 300, SCREEN_HEIGHT / 2 + 150);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "Game over!", 300, SCREEN_HEIGHT/2 - 50, 10);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "Your score: " + std::to_string(gameManager.GetPoints()), 300, SCREEN_HEIGHT / 2 + 50);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "Your highscore: " + std::to_string(gameManager.GetMaxPoints()), 300, SCREEN_HEIGHT / 2 + 100);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "Press F to pay replay! ", 300, SCREEN_HEIGHT / 2 + 150);
     }
 }
 

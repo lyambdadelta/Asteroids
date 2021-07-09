@@ -78,6 +78,7 @@ public:
     void Draw(uint32_t buff[]) override;
     void Move(float dt) override;
     void Accelerate(float dt);
+    POINT GetSpeed();
 private:
     // Due to acceleration it is easier to store sped as x and y values,
     // not as speed and direction
