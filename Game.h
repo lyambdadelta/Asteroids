@@ -4,13 +4,18 @@
 #include <vector>
 #include <list>
 
+enum class GameType {
+    SIGLEPLAYER,
+    MULTIPLAYER
+};
+
 // Diferent states of the game
 enum class GameState {
     MAINMENU,
-    LEADERBOARD,
     GAME,
     PAUSE,
-    GAMEOVER
+    GAMEOVER,
+    GAMEWIN
 };
 
 // Different colors for different Speed-type asteroids
@@ -44,9 +49,12 @@ struct BGRA {
 
 float Distance(POINT a, POINT b);
 int mod(int value, int m);
-void Bresenham(uint32_t buff[], POINT d1, POINT d2);
+void Bresenham(uint32_t buff[], POINT d1, POINT d2, uint32_t color);
 void DecreaseTime(float& t, float dt);
 void DrawString(uint32_t buff[], std::string str, uint32_t posx, uint32_t posy, uint32_t size);
+bool LoadDefaultBG(uint32_t buff[], std::string name);
+//float CalculateDirection(POINT a, POINT b);
+//POINT CalculateSpeed(float initDir, float speed, float collisionDir);
 
 class GameObject {
 public:
@@ -75,6 +83,7 @@ protected:
 class Player : public GameObject {
 public:
     Player();
+    Player(GameType argType, bool first);
     void Draw(uint32_t buff[]) override;
     void Move(float dt) override;
     void Accelerate(float dt);
@@ -100,6 +109,7 @@ public:
     Asteroid(const Asteroid& prev, bool type);
     AsteroidSpeed GetSpeedType() const;
     AsteroidSize GetSizeType() const;
+    //void RecalculateDirection(float dir, POINT initSpeed, POINT futureSpeed);
 private:
     AsteroidSpeed speedType;
     AsteroidSize sizeType;
@@ -114,34 +124,44 @@ private:
 class GameManager {
 public:
     Player player;
+    Player player2;
     std::vector<Asteroid> asteroids;
     std::list<Bullet> bullets;
+    std::list<Bullet> bullets2;
 
     std::vector<std::vector<int>> levelDifficulties;
 
     GameManager();
 
     void UpdateTimeGame(float dt);
-    void RestartGame();
+    void StartGame(GameType argType);
     void StartLevel();
     void NextLevel();
     void GameOver();
+    void GameWin();
     bool IsLevelOver() const;
-    int GetLifes() const;
-    void LostLife();
+    int GetLifes(bool first) const;
+    void LostLife(bool first);
     GameState GetState() const;
+    GameType GetType() const;
     bool IsGameOver() const;
-    bool CanShoot() const;
-    uint64_t GetPoints() const;
+    bool CanShoot(bool first) const;
+    uint64_t GetPoints(bool first) const;
     uint64_t GetMaxPoints() const;
-    void Shoot();
-    void setState(GameState argState);
+    void Shoot(bool first);
+    bool IsAlive(bool first) const;
+    void SetState(GameState argState);
+    void SetBG(bool success);
+    bool HasBG();
 private:
     GameState state;
-    uint64_t points;
-    uint64_t maxPoints;
-    int lifes;
+    GameType type;
+    uint64_t points, points2;
+    uint64_t maxPoints, maxPoints2;
+    bool hasBG;
+    int lifes, lifes2;
     int level;
-    float time;
-    float invincibleTime;
+    float time, time2;
+    float totaltime;
+    float invincibleTime, invincibleTime2;
 };
