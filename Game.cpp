@@ -11,21 +11,26 @@
 #include <cassert>
 
 constexpr float M_PI = 3.141592f;
-constexpr float ROTATIONSPEED = 10.0f;
+
+// Player constants
 constexpr float ACCELERATION = 50.0f;
+constexpr uint32_t LIVES = 3;
 constexpr float MAXSPEED = 120.0f;
-constexpr float BULLETSPEED = 200.0f;
-constexpr float BULLETTIME = 3.0f;
-constexpr float BULLETSIZE = 3.0f;
-constexpr float NONCREATIONRADIUS = 300.0f;
-constexpr int LIVES = 3;
+constexpr float PAUSETIME = 0.7f;
+constexpr float ROTATIONSPEED = 2.0f;
 constexpr float SIZE = 15.0f;
-constexpr float PAUSETIME = 0.01f;
 constexpr float INVINCIBLETIME = 3.0f;
 static Point INIT_POS = { SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 };
 static Point INIT_POS1 = { SCREEN_WIDTH / 3, SCREEN_HEIGHT / 2 };
 static Point INIT_POS2 = { 2 * SCREEN_WIDTH / 3, SCREEN_HEIGHT / 2 };
 
+// Bullet consants
+constexpr float BULLETSIZE = 3.0f;
+constexpr float BULLETSPEED = 200.0f;
+constexpr float BULLETTIME = 3.0f;
+
+// Asteroid constants
+constexpr float NONCREATIONRADIUS = 300.0f;
 uint32_t defaultBG[SCREEN_HEIGHT][SCREEN_WIDTH];
 
 uint32_t BGRA::GetInt() const {
@@ -52,18 +57,18 @@ void DrawString(uint32_t buff[], std::string str, uint32_t posx, uint32_t posy, 
             continue;
         }
         start = posx;
-        for (int j = 0; j < bitmap[x].size(); j++) {
-            for (int i = 0; i < bitmap[x][j].size(); i++) {
+        for (uint32_t j = 0; j < bitmap[x].size(); j++) {
+            for (uint32_t i = 0; i < bitmap[x][j].size(); i++) {
                 if (bitmap[x][j][i]) {
-                    for (int k = 0; k < size; k++) {
-                        for (int l = 0; l < size; l++) {
+                    for (uint32_t k = 0; k < size; k++) {
+                        for (uint32_t l = 0; l < size; l++) {
                             buff[mod(posy + j * size + k, SCREEN_HEIGHT) * SCREEN_WIDTH + mod(posx + i * size + l, SCREEN_WIDTH)] = BGRA({ 255, 255, 255, 0 }).GetInt();
                         }
                     }
                 }
             }
         }
-        posx = start + size * (bitmap[x][0].size() + 1);
+        posx = start + size * (static_cast<uint32_t>(bitmap[x][0].size()) + 1);
     }
 }
 
@@ -154,11 +159,11 @@ void GameObject::Rotate(float angle) {
 }
 
 void GameObject::Move(float dt) {
-    pos.x = fmod(pos.x + speed * cosf(dir) * dt, SCREEN_WIDTH);
+    pos.x = fmodf(pos.x + speed * cosf(dir) * dt, SCREEN_WIDTH);
     if (pos.x < 0) {
         pos.x += SCREEN_WIDTH;
     }
-    pos.y = fmod(pos.y + speed * sinf(dir) * dt, SCREEN_HEIGHT);
+    pos.y = fmodf(pos.y + speed * sinf(dir) * dt, SCREEN_HEIGHT);
     if (pos.x < 0) {
         pos.x += SCREEN_HEIGHT;
     }
@@ -234,8 +239,6 @@ void Player::Bullet::SetInitPosition(Player player) {
 }
 
 // Class Player
-Player::Player() {}
-
 Player::Player(GameType argType, bool first=true) {
     SetPosition((argType == GameType::SIGLEPLAYER) ? INIT_POS : (first) ? INIT_POS2 : INIT_POS1);
     initPos = GetPosition();
@@ -255,7 +258,7 @@ bool Player::CanShoot() const {
     return time == 0;
 }
 
-int Player::GetLifes() const {
+uint32_t Player::GetLifes() const {
     return lifes;
 }
 
@@ -276,7 +279,7 @@ void Player::Accelerate(float dt) {
     Point newSpeed = speed;
     newSpeed.x += ACCELERATION * cosf(dir) * dt;
     newSpeed.y += ACCELERATION * sinf(dir) * dt;
-    float newSpeedMod = std::sqrtf(std::pow(newSpeed.x, 2) + std::pow(newSpeed.y, 2));
+    float newSpeedMod = std::sqrtf(std::powf(newSpeed.x, 2) + std::powf(newSpeed.y, 2));
     if (newSpeedMod > MAXSPEED) {
         speed.x = newSpeed.x / newSpeedMod * MAXSPEED;
         speed.y = newSpeed.y / newSpeedMod * MAXSPEED;
@@ -293,11 +296,11 @@ void Player::AddPoints(uint64_t argPoints) {
 }
 
 void Player::Move(float dt) {
-    pos.x = fmod(pos.x + speed.x * dt, SCREEN_WIDTH);
+    pos.x = fmodf(pos.x + speed.x * dt, SCREEN_WIDTH);
     if (pos.x < 0) {
         pos.x += SCREEN_WIDTH;
     }
-    pos.y = fmod(pos.y + speed.y * dt, SCREEN_HEIGHT);
+    pos.y = fmodf(pos.y + speed.y * dt, SCREEN_HEIGHT);
     if (pos.x < 0) {
         pos.x += SCREEN_HEIGHT;
     }
@@ -340,7 +343,7 @@ void Player::Draw(uint32_t buff[]) const {
     // Calculate 4 dots for creating triangle-like player
     Point d1 = { pos.x + size * cosf(dir), pos.y + size * sinf(dir) };
     Point d2 = { pos.x + size * cosf(dir + 5 * M_PI / 6), pos.y + size * sinf(dir + 5 * M_PI / 6) };
-    Point d3 = { pos.x + 0.6 * size * cosf(dir + M_PI), pos.y + 0.6 * size * sinf(dir + M_PI) };
+    Point d3 = { pos.x + 0.6f * size * cosf(dir + M_PI), pos.y + 0.6f * size * sinf(dir + M_PI) };
     Point d4 = { pos.x + size * cosf(dir - 5 * M_PI / 6), pos.y + size * sinf(dir - 5 * M_PI / 6) };
     // Call Bresenham's line algorithm 4 times
     uint32_t color = GetColor();
@@ -366,7 +369,7 @@ void Player::DecreaseTime(float& t, float dt) {
 Asteroid::Asteroid(const Asteroid& prev, bool type) {
     speedType = prev.GetSpeedType();
     assert(prev.GetSizeType() != AsteroidSize::SMALL);
-    sizeType = AsteroidSize(static_cast<int>(prev.GetSizeType()) - 1);
+    sizeType = AsteroidSize(static_cast<uint32_t>(prev.GetSizeType()) - 1);
     SetInitSize(sizeType);
     SetSpeed(prev.GetSpeed() * 2 / sqrtf(3));
     SetDirection(prev.GetDirection() + ((type) ? M_PI : -M_PI) / 6);
@@ -523,10 +526,10 @@ void GameManager::GameWin() {
     points = 0;
     for (const auto& x : players) {
         points += x.GetPoints();
-        points += x.GetLifes() * 10000;
+        points += static_cast<uint64_t>(x.GetLifes()) * 10000;
     }
     players.clear();
-    uint32_t tme = static_cast<uint32_t>(totaltime);
+    uint64_t tme = static_cast<uint64_t>(totaltime);
     if (tme <= 1000) {
         points += (1000 - tme) * 100;
     }
@@ -638,7 +641,8 @@ void GameManager::UpdateTimeGame(float dt) {
                         asteroids.push_back(Asteroid(parent, false));
                         asteroids.push_back(Asteroid(parent, true));
                     }
-                    x.AddPoints((3 - static_cast<int64_t>(parent.GetSizeType())) * (pow(10, static_cast<int>(parent.GetSpeedType()))) * (level + 1));
+                    x.AddPoints((3 - static_cast<uint64_t>(parent.GetSizeType())) * 
+                        static_cast<uint64_t>(pow(10, static_cast<uint64_t>(parent.GetSpeedType()))) * (static_cast<uint64_t>(level) + 1));
                     break;
                 }
             }
@@ -683,26 +687,23 @@ void GameManager::LoadDefaultBG(uint32_t buff[], std::string name) {
     std::ifstream input(name);
     unsigned counter = 0;
     if (input.is_open()) {
-        for (int i = 9; i < SCREEN_HEIGHT - 9; i++) {
-            for (int j = 12; j < SCREEN_WIDTH - 12; j++) {
+        for (int i = 0; i < SCREEN_HEIGHT; i++) {
+            for (int j = 0; j < SCREEN_WIDTH; j++) {
                 input >> buff[i * SCREEN_WIDTH + j];
                 counter++;
             }
         }
         input.close();
     }
-    // After fix BG change to SCREEN_HEIGHT * SCREEN_WIDTH
-    hasBG = (counter == 750 * 1000) ? true : false;
+    hasBG = (counter == SCREEN_HEIGHT * SCREEN_WIDTH) ? true : false;
     return;
 }
 
 
 //
-//  TODO:
-//  Fix default BG
-//
 //  IDEAS:
-//  Collision detection (if asteroids - change direction [probably implement it in future])
+//  Add audio - impossible with the current Engine
+//  Collision detection for asteroids - not interesting result, drop
 //  Create death's animation
 //
 
@@ -710,7 +711,7 @@ static GameManager gameManager;
 
 // initialize game data in this function
 void initialize() {
-    srand(static_cast<unsigned int>(time(0)));
+    srand(static_cast<uint32_t>(time(0)));
     gameManager = {};
     gameManager.SetState(GameState::MAINMENU);
     gameManager.LoadDefaultBG(reinterpret_cast<uint32_t*>(defaultBG), "DefaultBG.txt");
@@ -854,7 +855,7 @@ void draw() {
         DrawString(reinterpret_cast<uint32_t*>(buffer), "Press LEFTRIGHT and AD to rotate", 300, SCREEN_HEIGHT / 2 + 150, 3);
         DrawString(reinterpret_cast<uint32_t*>(buffer), "Press SPACE and G to shoot", 300, SCREEN_HEIGHT / 2 + 200, 3);
         DrawString(reinterpret_cast<uint32_t*>(buffer), "Created by lumidelta\a and based on Atari 1979 ", 300, 730, 2);
-        DrawString(reinterpret_cast<uint32_t*>(buffer), "6+", 10, 730, 4);
+        DrawString(reinterpret_cast<uint32_t*>(buffer), "0+", 10, 730, 4);
     }
 }
 

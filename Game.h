@@ -86,12 +86,11 @@ public:
 
     std::list<Bullet> bullets;
 
-    Player();
     Player(GameType argType, bool first);
     
     // Info
     bool CanShoot() const;
-    int GetLifes() const;
+    uint32_t GetLifes() const;
     uint64_t GetPoints() const;
     Point GetSpeed() const;
     bool IsAlive() const;
@@ -112,7 +111,7 @@ private:
     // Due to acceleration it is easier to store sped as x and y values,
     // not as speed and direction
     float invincibleTime, time;
-    int lifes;
+    uint32_t lifes;
     uint64_t points;
     Point initPos, speed;
 
@@ -188,6 +187,6 @@ private:
     GameType type;
     uint64_t maxPoints, points;
     bool hasBG;
-    int level;
+    uint32_t level;
     float totaltime;
 };
