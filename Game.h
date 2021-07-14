@@ -18,21 +18,7 @@ enum class GameState {
     GAMEWIN
 };
 
-// Different colors for different Speed-type asteroids
-enum class AsteroidSpeed {
-    SLOW,
-    MEDIUM,
-    FAST
-};
-
-// Different stage of Asteroid's life
-enum class AsteroidSize {
-    SMALL,
-    NORMAL,
-    BIG
-};
-
-struct POINT {
+struct Point {
     float x;
     float y;
 };
@@ -47,121 +33,161 @@ struct BGRA {
     uint32_t GetInt() const;
 };
 
-float Distance(POINT a, POINT b);
-int mod(int value, int m);
-void Bresenham(uint32_t buff[], POINT d1, POINT d2, uint32_t color);
-void DecreaseTime(float& t, float dt);
+void Bresenham(uint32_t buff[], Point d1, Point d2, uint32_t color);
+float Distance(Point a, Point b);
 void DrawString(uint32_t buff[], std::string str, uint32_t posx, uint32_t posy, uint32_t size);
-bool LoadDefaultBG(uint32_t buff[], std::string name);
-//float CalculateDirection(POINT a, POINT b);
-//POINT CalculateSpeed(float initDir, float speed, float collisionDir);
+int mod(int value, int m);
+
+//float CalculateDirection(Point a, Point b);
+//Point CalculateSpeed(float initDir, float speed, float collisionDir);
+
 
 class GameObject {
 public:
     GameObject();
+
+    // Info
+    uint32_t GetColor() const;
+    float GetDirection() const;
+    Point GetPosition() const;
     float GetSize() const;
     float GetSpeed() const;
-    float GetDirection() const;
-    POINT GetPosition() const;
-    uint32_t GetColor() const;
+    
+    // Action
     void Rotate(float angle);
-    virtual void Draw(uint32_t buff[]);
     virtual void Move(float dt);
-    void SetColor(BGRA argColor);
+
+    virtual void Draw(uint32_t buff[]) const;
+    
 protected:
+    float dir, size, speed;
+    Point pos;
+    BGRA color;
+
+    // Set
+    void SetColor(BGRA argColor);
+    void SetSpeed(float argSpeed);
     void SetDirection(float argDir);
     void SetSize(float argSize);
-    void SetSpeed(float argSpeed);
-    void SetPosition(POINT argPosition);
-    float size;
-    float speed;
-    float dir;
-    POINT pos;
-    BGRA color;
+    void SetPosition(Point argPosition);
 };
+
 
 class Player : public GameObject {
 public:
+    class Bullet : public GameObject {
+    public:
+        Bullet(Player player);
+        bool UpdateTime(float dt);
+    private:
+        void SetInitPosition(Player player);
+        float ttl;
+    };
+
+    std::list<Bullet> bullets;
+
     Player();
     Player(GameType argType, bool first);
-    void Draw(uint32_t buff[]) override;
-    void Move(float dt) override;
+    
+    // Info
+    bool CanShoot() const;
+    int GetLifes() const;
+    uint64_t GetPoints() const;
+    Point GetSpeed() const;
+    bool IsAlive() const;
+
+    // Action
     void Accelerate(float dt);
-    POINT GetSpeed();
+    void AddPoints(uint64_t points);
+    void Move(float dt) override;
+    void Shoot();
+    void UpdateTime(float dt);
+
+    // Reset    
+    void Reset();
+    void Collision();
+
+    void Draw(uint32_t buff[]) const override;
 private:
     // Due to acceleration it is easier to store sped as x and y values,
     // not as speed and direction
-    POINT speed;
-};
+    float invincibleTime, time;
+    int lifes;
+    uint64_t points;
+    Point initPos, speed;
 
-class Bullet : public GameObject {
-public:
-    Bullet(Player player);
-    bool UpdateTime(float dt);
-private:
-    void SetInitPosition(Player player);
-    float ttl;
+    void DecreaseTime(float& t, float dt);
+    void SetSpeed(Point argSpeed);
 };
 
 class Asteroid : public GameObject {
 public:
+    // Different colors for different Speed-type asteroids
+    enum class AsteroidSpeed {
+        SLOW,
+        MEDIUM,
+        FAST
+    };
+
+    // Different stage of Asteroid's life
+    enum class AsteroidSize {
+        SMALL,
+        NORMAL,
+        BIG
+    };
+
     Asteroid(AsteroidSpeed argSpeed, AsteroidSize argSize);
     Asteroid(const Asteroid& prev, bool type);
+
+    // Info
     AsteroidSpeed GetSpeedType() const;
     AsteroidSize GetSizeType() const;
-    //void RecalculateDirection(float dir, POINT initSpeed, POINT futureSpeed);
+    //void RecalculateDirection(float dir, Point initSpeed, Point futureSpeed);
 private:
-    AsteroidSpeed speedType;
     AsteroidSize sizeType;
-    void SetInitSize(AsteroidSize argSize);
-    void SetInitSpeed(AsteroidSpeed argSpeed);
+    AsteroidSpeed speedType;
+
+    // Set
+    void SetInitColor(AsteroidSpeed argSpeed);
     void SetInitDirection();
     void SetInitPosition();
-    void SetInitColor(AsteroidSpeed argSpeed);
+    void SetInitSize(AsteroidSize argSize);
+    void SetInitSpeed(AsteroidSpeed argSpeed);
 };
 
 // Manager for the game that controls situation on the field
 class GameManager {
 public:
-    Player player;
-    Player player2;
+    std::vector<Player> players;
     std::vector<Asteroid> asteroids;
-    std::list<Bullet> bullets;
-    std::list<Bullet> bullets2;
-
-    std::vector<std::vector<int>> levelDifficulties;
 
     GameManager();
 
-    void UpdateTimeGame(float dt);
-    void StartGame(GameType argType);
-    void StartLevel();
-    void NextLevel();
-    void GameOver();
-    void GameWin();
-    bool IsLevelOver() const;
-    int GetLifes(bool first) const;
-    void LostLife(bool first);
+    // Info
+    uint64_t GetMaxPoints() const;
+    uint64_t GetPoints() const;
     GameState GetState() const;
     GameType GetType() const;
+    bool HasBG() const;
     bool IsGameOver() const;
-    bool CanShoot(bool first) const;
-    uint64_t GetPoints(bool first) const;
-    uint64_t GetMaxPoints() const;
-    void Shoot(bool first);
-    bool IsAlive(bool first) const;
+    bool IsLevelOver() const;
+
+    // Update game states
+    void GameOver();
+    void GameWin();
+    void NextLevel();
     void SetState(GameState argState);
-    void SetBG(bool success);
-    bool HasBG();
+    void StartGame(GameType argType);
+    void StartLevel();
+    void UpdateTimeGame(float dt);
+    
+    void LoadDefaultBG(uint32_t buff[], std::string name);
 private:
+    std::vector<std::vector<int>> levelDifficulties;
     GameState state;
     GameType type;
-    uint64_t points, points2;
-    uint64_t maxPoints, maxPoints2;
+    uint64_t maxPoints, points;
     bool hasBG;
-    int lifes, lifes2;
     int level;
-    float time, time2;
     float totaltime;
-    float invincibleTime, invincibleTime2;
 };
